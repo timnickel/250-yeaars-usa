@@ -2,15 +2,19 @@
 
 ## Core Wiring
 
-1. Arduino data pin D6 -> 330 ohm resistor -> matrix DIN.
+1. Arduino data pin D6 -> 330 to 470 ohm resistor -> matrix DIN.
 2. External 5V PSU + -> matrix +5V.
 3. External 5V PSU - -> matrix GND.
 4. Arduino GND -> matrix GND.
 5. Arduino GND -> PSU GND (common ground).
 
+## Resistor Orientation
+
+The resistor does not have polarity, so it can be installed in either direction. It is just a series part on the data line, so the important thing is that it sits between the Arduino data pin and matrix DIN.
+
 ## Protection Parts
 
-- 330 ohm series resistor on data line.
+- 330 to 470 ohm series resistor on data line.
 - 1000 uF electrolytic capacitor across +5V and GND near the matrix input terminals.
 - The capacitor does not connect to the Arduino/Yun board; it connects to the matrix power rails.
 
