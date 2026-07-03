@@ -125,3 +125,16 @@ Notes:
 3. Confirm common ground everywhere.
 4. Start with low brightness.
 5. Enable bring-up mode in `hardware_config.h` before full show mode.
+
+## Why The Capacitor Is Needed
+
+The capacitor gives the matrix a small local reserve of power. That helps smooth fast current spikes when many LEDs turn on at once, which reduces flicker and resets. It is a support part for the matrix power rail, not a substitute for proper external power.
+
+## Capacitor Polarity
+
+For a polarized electrolytic capacitor, wire it as follows:
+
+1. Positive lead to +5V.
+2. Negative lead to GND.
+3. Look for the stripe on the case to identify the negative side.
+4. When in doubt, do not guess; verify the marking before powering on.
