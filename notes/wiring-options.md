@@ -11,6 +11,7 @@ Yes, sometimes.
 3. 5V logic boards (Uno/Nano/Yun) usually drive WS2812 DIN directly.
 4. 3.3V logic boards (ESP32, some modern boards) are more reliable with a 74AHCT125/74HCT14 level shifter for DIN.
 5. Regardless of board type, do not power a large matrix from the board 5V pin.
+6. The capacitor goes across the matrix +5V and GND rails near the matrix input; it does not plug into the Arduino board.
 
 ## Option A: Uno/Nano/Yun (5V Logic, External 5V Matrix PSU)
 
@@ -20,7 +21,7 @@ flowchart LR
     R[330 ohm resistor]
     M[WS2812 32x8 Matrix]
     PSU[External 5V Power Supply]
-    C[1000 uF capacitor]
+    C[1000 uF capacitor across +5V and GND]
 
     A -- Data pin D6 --> R --> M
     A -- GND --> M
@@ -33,6 +34,7 @@ flowchart LR
 Notes:
 - Data pin can be changed in `hardware_config.h`.
 - Keep data line short and routed away from noisy power wiring.
+- Place the capacitor physically at the matrix power input: one lead on +5V, the other on GND.
 
 ## Option B: 3.3V Logic Board with Level Shifter (Preferred for Reliability)
 
@@ -43,7 +45,7 @@ flowchart LR
     R[330 ohm resistor]
     M[WS2812 32x8 Matrix]
     PSU[External 5V Power Supply]
-    C[1000 uF capacitor]
+    C[1000 uF capacitor across +5V and GND]
 
     B -- Data GPIO 3.3V --> LS
     LS -- 5V data out --> R --> M
@@ -58,6 +60,7 @@ flowchart LR
 Notes:
 - Power the level shifter from 5V so the output high level is suitable for WS2812 DIN.
 - Common ground between board, shifter, and matrix is required.
+- The capacitor still goes across the matrix power rails, not on the board side.
 
 ## Option C: Small Test Setup (Board USB Power, Low Brightness Only)
 
@@ -66,7 +69,7 @@ flowchart LR
     A[Arduino USB powered]
     R[330 ohm resistor]
     M[WS2812 Matrix]
-    C[1000 uF capacitor]
+    C[1000 uF capacitor across +5V and GND]
 
     A -- Data pin --> R --> M
     A -- 5V --> M
@@ -77,6 +80,7 @@ flowchart LR
 Notes:
 - Use only for short bring-up tests and very low brightness.
 - Not recommended for sustained full-matrix animations.
+- The capacitor connects to the matrix +5V and GND pins or screw terminals, whichever the panel uses.
 
 ## Option D: Recommended Production Wiring (Power Injection Ready)
 
@@ -87,7 +91,7 @@ flowchart LR
     M1[Matrix power input end]
     M2[Matrix far end]
     PSU[External 5V supply]
-    C1[1000 uF cap near input]
+    C1[1000 uF capacitor across input +5V and GND]
 
     A -- Data --> R --> M1
     A -- GND --> M1
@@ -102,6 +106,7 @@ flowchart LR
 Notes:
 - Injection at the far end helps reduce voltage drop on brighter scenes.
 - Use appropriate wire gauge based on expected current.
+- Keep the capacitor at the input end, directly across the same +5V and GND feed used by the matrix.
 
 ## Board Type Guidance
 

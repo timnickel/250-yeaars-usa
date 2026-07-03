@@ -11,7 +11,8 @@
 ## Protection Parts
 
 - 330 ohm series resistor on data line.
-- 1000 uF electrolytic capacitor across +5V and GND near matrix input.
+- 1000 uF electrolytic capacitor across +5V and GND near the matrix input terminals.
+- The capacitor does not connect to the Arduino/Yun board; it connects to the matrix power rails.
 
 ## Bring-Up Safety
 
