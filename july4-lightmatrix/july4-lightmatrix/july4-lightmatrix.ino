@@ -30,5 +30,20 @@ void loop() {
         return;
     }
 
+    if (kRunCornerOrientationTest) {
+        runCornerOrientationTest(matrix, nowMs);
+        return;
+    }
+
+    if (kRunCornerSequenceTest) {
+        runCornerSequenceTest(matrix, nowMs);
+        return;
+    }
+
+    if (kRunDebugShowcase) {
+        runDebugShowcase(matrix, nowMs);
+        return;
+    }
+
     scenesUpdate(nowMs);
 }

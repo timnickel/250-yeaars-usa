@@ -18,7 +18,13 @@ struct Glyph {
 
 constexpr Glyph kFont[] = {
     {' ', {0, 0, 0, 0, 0, 0, 0}},
+    {'.', {0, 0, 0, 0, 0, 0b00100, 0b00100}},
+    {'0', {0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110}},
+    {'1', {0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110}},
+    {'2', {0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111}},
     {'4', {0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010}},
+    {'6', {0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110}},
+    {'7', {0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000}},
     {'A', {0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001}},
     {'H', {0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001}},
     {'P', {0b11110, 0b10001, 0b10001, 0b11110, 0b10000, 0b10000, 0b10000}},
@@ -38,6 +44,8 @@ struct SceneDef {
     SceneRenderFn render;
     uint8_t durationSec;
 };
+
+constexpr uint16_t kDebugPhaseDurationsMs[] = {7000, 4000, 5000, 6000, 6000, 6000};
 
 uint16_t xyToIndex(uint8_t x, uint8_t y) {
     if (x >= kMatrixWidth || y >= kMatrixHeight) {
@@ -118,6 +126,106 @@ void drawText(int16_t originX, int16_t originY, const char* text, uint32_t color
         drawChar(x, originY, text[i], color);
         x += 6;
     }
+}
+
+int16_t measureTextWidth(const char* text) {
+    int16_t width = 0;
+    for (uint16_t i = 0; text[i] != '\0'; ++i) {
+        width += 6;
+    }
+    return width;
+}
+
+void drawCenteredText(const char* text, int16_t originY, uint32_t color) {
+    const int16_t width = measureTextWidth(text);
+    const int16_t originX = (static_cast<int16_t>(kMatrixWidth) - width) / 2;
+    drawText(originX, originY, text, color);
+}
+
+void drawStarSprite(int16_t originX, int16_t originY, uint32_t color) {
+    for (uint8_t row = 0; row < 8; ++row) {
+        for (uint8_t col = 0; col < 8; ++col) {
+            if ((kStar8x8[row] & (1U << col)) == 0U) {
+                continue;
+            }
+            const int16_t x = originX + col;
+            const int16_t y = originY + row;
+            if (x < 0 || y < 0 || x >= kMatrixWidth || y >= kMatrixHeight) {
+                continue;
+            }
+            setPixelXY(static_cast<uint8_t>(x), static_cast<uint8_t>(y), color);
+        }
+    }
+}
+
+void renderScrollingText(const char* text, uint32_t elapsedMs, uint32_t color, uint16_t speedMs) {
+    clearAll();
+    const int16_t textWidth = measureTextWidth(text);
+    const int16_t offset = static_cast<int16_t>(elapsedMs / speedMs);
+    const int16_t x = static_cast<int16_t>(kMatrixWidth) - offset;
+
+    drawText(x, 0, text, color);
+    if (x + textWidth < 0) {
+        drawText(static_cast<int16_t>(kMatrixWidth), 0, text, color);
+    }
+}
+
+void renderUsaPulse(uint32_t elapsedMs) {
+    clearAll();
+    const uint8_t pulse = static_cast<uint8_t>(96U + ((elapsedMs / 20U) % 96U));
+    drawCenteredText("USA", 0, scaleColor(rgb(255, 255, 255), pulse));
+}
+
+void renderStarSweep(uint32_t elapsedMs) {
+    for (uint8_t y = 0; y < kMatrixHeight; ++y) {
+        for (uint8_t x = 0; x < kMatrixWidth; ++x) {
+            setPixelXY(x, y, rgb(0, 0, 24));
+        }
+    }
+
+    for (uint8_t i = 0; i < 8; ++i) {
+        const uint8_t sx = static_cast<uint8_t>((i * 7U + (elapsedMs / 250U)) % kMatrixWidth);
+        const uint8_t sy = static_cast<uint8_t>((i * 3U + (elapsedMs / 600U)) % kMatrixHeight);
+        setPixelXY(sx, sy, rgb(32, 32, 72));
+    }
+
+    const int16_t travel = static_cast<int16_t>(kMatrixWidth + 8U);
+    const int16_t starX = static_cast<int16_t>(travel - 1 - ((elapsedMs / 140U) % travel)) - 7;
+    drawStarSprite(starX, 0, rgb(255, 255, 255));
+}
+
+void renderSparkler(uint32_t elapsedMs) {
+    clearAll();
+    const uint8_t baseX = static_cast<uint8_t>(kMatrixWidth / 2U);
+
+    for (uint8_t y = 0; y < kMatrixHeight; ++y) {
+        const uint8_t warm = static_cast<uint8_t>(40U + y * 10U);
+        setPixelXY(baseX, static_cast<uint8_t>(kMatrixHeight - 1U - y), rgb(warm, warm / 4U, 0));
+    }
+
+    for (uint8_t i = 0; i < 10; ++i) {
+        const uint8_t sparkX = static_cast<uint8_t>((baseX + i * 5U + (elapsedMs / 90U)) % kMatrixWidth);
+        const uint8_t sparkY = static_cast<uint8_t>((i * 11U + (elapsedMs / 60U)) % kMatrixHeight);
+        const uint32_t color = (i & 1U) == 0U ? rgb(255, 255, 255) : rgb(80, 80, 255);
+        setPixelXY(sparkX, sparkY, color);
+    }
+}
+
+uint8_t getDebugPhase(uint32_t nowMs, uint32_t* phaseElapsedMs) {
+    const uint32_t totalCycleMs = 7000UL + 4000UL + 5000UL + 6000UL + 6000UL + 6000UL;
+    uint32_t inCycle = nowMs % totalCycleMs;
+
+    for (uint8_t phase = 0; phase < (sizeof(kDebugPhaseDurationsMs) / sizeof(kDebugPhaseDurationsMs[0])); ++phase) {
+        const uint16_t duration = kDebugPhaseDurationsMs[phase];
+        if (inCycle < duration) {
+            *phaseElapsedMs = inCycle;
+            return phase;
+        }
+        inCycle -= duration;
+    }
+
+    *phaseElapsedMs = 0;
+    return 0;
 }
 
 void introInit() {
@@ -334,6 +442,96 @@ void runBringUpTest(Adafruit_NeoPixel& matrix, uint32_t nowMs) {
         const uint8_t scanX = static_cast<uint8_t>((nowMs / 80U) % kMatrixWidth);
         const uint8_t scanY = static_cast<uint8_t>((nowMs / 140U) % kMatrixHeight);
         matrix.setPixelColor(xyToIndex(scanX, scanY), matrix.Color(255, 255, 255));
+    }
+
+    matrix.show();
+}
+
+void runCornerOrientationTest(Adafruit_NeoPixel& matrix, uint32_t nowMs) {
+    matrix.clear();
+
+    // Distinct corner colors make orientation obvious at a glance.
+    matrix.setPixelColor(xyToIndex(0, 0), matrix.Color(180, 0, 0));
+    matrix.setPixelColor(xyToIndex(kMatrixWidth - 1U, 0), matrix.Color(0, 180, 0));
+    matrix.setPixelColor(xyToIndex(0, kMatrixHeight - 1U), matrix.Color(0, 0, 180));
+    matrix.setPixelColor(
+        xyToIndex(kMatrixWidth - 1U, kMatrixHeight - 1U), matrix.Color(180, 180, 180));
+
+    // Trace clockwise around the perimeter so row/column direction can be verified.
+    const uint16_t perimeter = static_cast<uint16_t>(2U * kMatrixWidth + 2U * kMatrixHeight - 4U);
+    const uint16_t pos = static_cast<uint16_t>((nowMs / 120U) % perimeter);
+
+    uint8_t x = 0;
+    uint8_t y = 0;
+
+    if (pos < kMatrixWidth) {
+        x = static_cast<uint8_t>(pos);
+        y = 0;
+    } else if (pos < static_cast<uint16_t>(kMatrixWidth + kMatrixHeight - 1U)) {
+        x = static_cast<uint8_t>(kMatrixWidth - 1U);
+        y = static_cast<uint8_t>(pos - kMatrixWidth + 1U);
+    } else if (pos < static_cast<uint16_t>(2U * kMatrixWidth + kMatrixHeight - 2U)) {
+        x = static_cast<uint8_t>(kMatrixWidth - 1U -
+                                 (pos - (kMatrixWidth + kMatrixHeight - 1U)));
+        y = static_cast<uint8_t>(kMatrixHeight - 1U);
+    } else {
+        x = 0;
+        y = static_cast<uint8_t>(kMatrixHeight - 1U -
+                                 (pos - (2U * kMatrixWidth + kMatrixHeight - 2U)));
+    }
+
+    matrix.setPixelColor(xyToIndex(x, y), matrix.Color(255, 180, 0));
+    matrix.show();
+}
+
+void runCornerSequenceTest(Adafruit_NeoPixel& matrix, uint32_t nowMs) {
+    matrix.clear();
+
+    const uint8_t phase = static_cast<uint8_t>((nowMs / 900U) % 4U);
+
+    if (phase == 0U) {
+        matrix.setPixelColor(xyToIndex(0, 0), matrix.Color(255, 0, 0));
+    } else if (phase == 1U) {
+        matrix.setPixelColor(xyToIndex(kMatrixWidth - 1U, 0), matrix.Color(0, 255, 0));
+    } else if (phase == 2U) {
+        matrix.setPixelColor(
+            xyToIndex(kMatrixWidth - 1U, kMatrixHeight - 1U), matrix.Color(255, 255, 255));
+    } else {
+        matrix.setPixelColor(xyToIndex(0, kMatrixHeight - 1U), matrix.Color(0, 0, 255));
+    }
+
+    matrix.show();
+}
+
+void runDebugShowcase(Adafruit_NeoPixel& matrix, uint32_t nowMs) {
+    static uint8_t previousPhase = 0xFFU;
+
+    uint32_t phaseElapsedMs = 0;
+    const uint8_t phase = getDebugPhase(nowMs, &phaseElapsedMs);
+    if (phase != previousPhase) {
+        clearAll();
+        if (phase == 5U) {
+            fireworksInit();
+        }
+        previousPhase = phase;
+    }
+
+    if (phase == 0U) {
+        renderScrollingText(kDebugVersion, phaseElapsedMs, rgb(255, 255, 255), 70U);
+    } else if (phase == 1U) {
+        renderUsaPulse(phaseElapsedMs);
+    } else if (phase == 2U) {
+        renderScrollingText("1776", phaseElapsedMs, rgb(255, 40, 40), 85U);
+    } else if (phase == 3U) {
+        stripeRender(phaseElapsedMs);
+    } else if (phase == 4U) {
+        renderStarSweep(phaseElapsedMs);
+    } else {
+        if ((phaseElapsedMs / 1000U) < 3U) {
+            renderSparkler(phaseElapsedMs);
+        } else {
+            fireworksRender(phaseElapsedMs - 3000U);
+        }
     }
 
     matrix.show();
