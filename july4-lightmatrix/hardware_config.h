@@ -6,8 +6,31 @@
 constexpr uint8_t kMatrixPin = 6;
 constexpr uint8_t kMatrixWidth = 32;
 constexpr uint8_t kMatrixHeight = 8;
-constexpr bool kMatrixSerpentine = true;
-constexpr bool kMatrixRowMajor = false;
+
+enum class PanelProfile : uint8_t {
+	Bottom,
+	Top,
+};
+
+// Select which physical panel is connected for the next upload.
+constexpr PanelProfile kActivePanelProfile = PanelProfile::Bottom;
+
+// Bottom panel mapping (already verified).
+constexpr bool kBottomMatrixSerpentine = true;
+constexpr bool kBottomMatrixRowMajor = false;
+
+// Top panel mapping defaults to the bottom panel until verified.
+constexpr bool kTopMatrixSerpentine = true;
+constexpr bool kTopMatrixRowMajor = false;
+
+constexpr bool activeMatrixSerpentine() {
+	return kActivePanelProfile == PanelProfile::Bottom ? kBottomMatrixSerpentine : kTopMatrixSerpentine;
+}
+
+constexpr bool activeMatrixRowMajor() {
+	return kActivePanelProfile == PanelProfile::Bottom ? kBottomMatrixRowMajor : kTopMatrixRowMajor;
+}
+
 constexpr uint16_t kNumPixels = kMatrixWidth * kMatrixHeight;
 
 // NeoPixel color order and speed for WS2812
@@ -21,6 +44,9 @@ constexpr uint8_t kDefaultBrightness = kBrightnessIndoor;
 // Set true for Phase 0 mapping/power bring-up tests.
 constexpr bool kRunBringUpTest = false;
 
+// Set true for a raw index-chain test (bypasses XY mapping).
+constexpr bool kRunRawChainTest = false;
+
 // Set true for a simple orientation test with colored corners and a perimeter tracer.
 constexpr bool kRunCornerOrientationTest = false;
 
@@ -31,7 +57,7 @@ constexpr bool kRunCornerSequenceTest = false;
 constexpr bool kRunDebugShowcase = true;
 
 // Update this string whenever a meaningful debug build is prepared.
-constexpr char kDebugVersion[] = "2026.7.4.1";
+constexpr char kDebugVersion[] = "2026.7.4.10";
 
 // Animation pacing
 constexpr uint16_t kFrameMs = 33;  // ~30 FPS

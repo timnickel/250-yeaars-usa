@@ -30,6 +30,11 @@ void loop() {
         return;
     }
 
+    if (kRunRawChainTest) {
+        runRawChainTest(matrix, nowMs);
+        return;
+    }
+
     if (kRunCornerOrientationTest) {
         runCornerOrientationTest(matrix, nowMs);
         return;

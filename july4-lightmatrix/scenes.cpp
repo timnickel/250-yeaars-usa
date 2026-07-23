@@ -26,8 +26,12 @@ constexpr Glyph kFont[] = {
     {'6', {0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110}},
     {'7', {0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000}},
     {'A', {0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001}},
+    {'E', {0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111}},
     {'H', {0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001}},
+    {'L', {0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111}},
+    {'O', {0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110}},
     {'P', {0b11110, 0b10001, 0b10001, 0b11110, 0b10000, 0b10000, 0b10000}},
+    {'R', {0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001}},
     {'S', {0b01111, 0b10000, 0b10000, 0b01110, 0b00001, 0b00001, 0b11110}},
     {'T', {0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100}},
     {'U', {0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110}},
@@ -45,15 +49,20 @@ struct SceneDef {
     uint8_t durationSec;
 };
 
-constexpr uint16_t kDebugPhaseDurationsMs[] = {7000, 4000, 5000, 6000, 6000, 6000};
+constexpr uint16_t kDebugPhaseDurationsMs[] = {
+    7000, 3500, 3500, 3500, 3500,
+    3500, 3500, 3500, 3000, 3500,
+    3500, 3500, 3000, 3000, 3500,
+    3500, 3500, 3500, 3500, 3500,
+};
 
 uint16_t xyToIndex(uint8_t x, uint8_t y) {
     if (x >= kMatrixWidth || y >= kMatrixHeight) {
         return 0;
     }
 
-    if (kMatrixRowMajor) {
-        if (!kMatrixSerpentine) {
+    if (activeMatrixRowMajor()) {
+        if (!activeMatrixSerpentine()) {
             return static_cast<uint16_t>(y) * kMatrixWidth + x;
         }
         if ((y & 1U) == 0U) {
@@ -62,7 +71,7 @@ uint16_t xyToIndex(uint8_t x, uint8_t y) {
         return static_cast<uint16_t>(y) * kMatrixWidth + (kMatrixWidth - 1U - x);
     }
 
-    if (!kMatrixSerpentine) {
+    if (!activeMatrixSerpentine()) {
         return static_cast<uint16_t>(x) * kMatrixHeight + y;
     }
     if ((x & 1U) == 0U) {
@@ -91,6 +100,18 @@ uint32_t scaleColor(uint32_t color, uint8_t scale) {
     const uint8_t g = static_cast<uint8_t>((((color >> 8) & 0xFFU) * scale) >> 8);
     const uint8_t b = static_cast<uint8_t>(((color & 0xFFU) * scale) >> 8);
     return rgb(r, g, b);
+}
+
+uint32_t wheelColor(uint8_t pos) {
+    if (pos < 85U) {
+        return rgb(static_cast<uint8_t>(255U - pos * 3U), static_cast<uint8_t>(pos * 3U), 0);
+    }
+    if (pos < 170U) {
+        pos = static_cast<uint8_t>(pos - 85U);
+        return rgb(0, static_cast<uint8_t>(255U - pos * 3U), static_cast<uint8_t>(pos * 3U));
+    }
+    pos = static_cast<uint8_t>(pos - 170U);
+    return rgb(static_cast<uint8_t>(pos * 3U), 0, static_cast<uint8_t>(255U - pos * 3U));
 }
 
 const Glyph* findGlyph(char c) {
@@ -211,8 +232,181 @@ void renderSparkler(uint32_t elapsedMs) {
     }
 }
 
+void renderDiagonalRainbow(uint32_t elapsedMs) {
+    for (uint8_t y = 0; y < kMatrixHeight; ++y) {
+        for (uint8_t x = 0; x < kMatrixWidth; ++x) {
+            const uint8_t hue = static_cast<uint8_t>(x * 7U + y * 14U + (elapsedMs / 20U));
+            setPixelXY(x, y, wheelColor(hue));
+        }
+    }
+}
+
+void renderVerticalScanner(uint32_t elapsedMs) {
+    clearAll();
+    const uint8_t x = static_cast<uint8_t>((elapsedMs / 70U) % kMatrixWidth);
+    const uint8_t xm1 = static_cast<uint8_t>((x + kMatrixWidth - 1U) % kMatrixWidth);
+    const uint8_t xm2 = static_cast<uint8_t>((x + kMatrixWidth - 2U) % kMatrixWidth);
+    for (uint8_t y = 0; y < kMatrixHeight; ++y) {
+        setPixelXY(xm2, y, rgb(10, 10, 30));
+        setPixelXY(xm1, y, rgb(30, 30, 80));
+        setPixelXY(x, y, rgb(255, 255, 255));
+    }
+}
+
+void renderHorizontalScanner(uint32_t elapsedMs) {
+    clearAll();
+    const uint8_t y = static_cast<uint8_t>((elapsedMs / 120U) % kMatrixHeight);
+    const uint8_t ym1 = static_cast<uint8_t>((y + kMatrixHeight - 1U) % kMatrixHeight);
+    for (uint8_t x = 0; x < kMatrixWidth; ++x) {
+        setPixelXY(x, ym1, rgb(20, 0, 30));
+        setPixelXY(x, y, rgb(255, 60, 60));
+    }
+}
+
+void renderCheckerPulse(uint32_t elapsedMs) {
+    uint8_t wave = static_cast<uint8_t>((elapsedMs / 10U) % 64U);
+    if (wave > 31U) {
+        wave = static_cast<uint8_t>(63U - wave);
+    }
+    const uint8_t s = static_cast<uint8_t>(90U + wave * 5U);
+    for (uint8_t y = 0; y < kMatrixHeight; ++y) {
+        for (uint8_t x = 0; x < kMatrixWidth; ++x) {
+            const bool even = ((x + y) & 1U) == 0U;
+            const uint32_t c = even ? rgb(255, 30, 30) : rgb(30, 30, 255);
+            setPixelXY(x, y, scaleColor(c, s));
+        }
+    }
+}
+
+void renderBarsBreathing(uint32_t elapsedMs) {
+    const uint8_t shift = static_cast<uint8_t>(elapsedMs / 18U);
+    for (uint8_t y = 0; y < kMatrixHeight; ++y) {
+        for (uint8_t x = 0; x < kMatrixWidth; ++x) {
+            const uint8_t band = static_cast<uint8_t>((x / 11U) % 3U);
+            uint32_t base = rgb(220, 220, 220);
+            if (band == 0U) {
+                base = rgb(220, 20, 20);
+            } else if (band == 2U) {
+                base = rgb(20, 20, 220);
+            }
+            const uint8_t pulse = static_cast<uint8_t>(90U + ((shift + x + y * 3U) & 0x3FU) * 2U);
+            setPixelXY(x, y, scaleColor(base, pulse));
+        }
+    }
+}
+
+void renderCenterBurst(uint32_t elapsedMs) {
+    clearAll();
+    const int8_t cx = static_cast<int8_t>(kMatrixWidth / 2U);
+    const int8_t cy = static_cast<int8_t>(kMatrixHeight / 2U);
+    const uint8_t radius = static_cast<uint8_t>((elapsedMs / 150U) % 12U);
+    for (uint8_t y = 0; y < kMatrixHeight; ++y) {
+        for (uint8_t x = 0; x < kMatrixWidth; ++x) {
+            const int8_t dx = static_cast<int8_t>(x) - cx;
+            const int8_t dy = static_cast<int8_t>(y) - cy;
+            const uint8_t d2 = static_cast<uint8_t>(dx * dx + dy * dy);
+            if (d2 <= static_cast<uint8_t>(radius * radius)) {
+                setPixelXY(x, y, rgb(255, 255, 255));
+            } else if (d2 <= static_cast<uint8_t>((radius + 2U) * (radius + 2U))) {
+                setPixelXY(x, y, rgb(40, 40, 160));
+            }
+        }
+    }
+}
+
+void renderTroopSalute(uint32_t elapsedMs) {
+    const uint8_t part = static_cast<uint8_t>((elapsedMs / 1700U) % 2U);
+
+    if (part == 0U) {
+        renderScrollingText("SALUTE HERO", elapsedMs, rgb(240, 240, 240), 78U);
+        return;
+    }
+
+    // Ceremonial march stripes with star markers.
+    clearAll();
+    const uint8_t shift = static_cast<uint8_t>(elapsedMs / 40U);
+
+    for (uint8_t y = 0; y < kMatrixHeight; ++y) {
+        for (uint8_t x = 0; x < kMatrixWidth; ++x) {
+            const uint8_t stripe = static_cast<uint8_t>(((x + shift) / 3U) % 3U);
+            uint32_t c = rgb(20, 20, 100);
+            if (stripe == 0U) {
+                c = rgb(200, 25, 25);
+            } else if (stripe == 1U) {
+                c = rgb(220, 220, 220);
+            }
+            setPixelXY(x, y, c);
+        }
+    }
+
+    for (uint8_t i = 0; i < 4; ++i) {
+        const uint8_t sx = static_cast<uint8_t>((i * 8U + (elapsedMs / 90U)) % kMatrixWidth);
+        const uint8_t sy = static_cast<uint8_t>(1U + ((i + (elapsedMs / 400U)) % 6U));
+        setPixelXY(sx, sy, rgb(255, 255, 255));
+    }
+}
+
+void renderCometTrail(uint32_t elapsedMs) {
+    for (uint16_t i = 0; i < kNumPixels; ++i) {
+        const uint32_t c = gMatrix->getPixelColor(i);
+        const uint8_t r = static_cast<uint8_t>(((c >> 16) & 0xFFU) * 200U / 255U);
+        const uint8_t g = static_cast<uint8_t>(((c >> 8) & 0xFFU) * 200U / 255U);
+        const uint8_t b = static_cast<uint8_t>((c & 0xFFU) * 200U / 255U);
+        gMatrix->setPixelColor(i, rgb(r, g, b));
+    }
+
+    const uint8_t x = static_cast<uint8_t>((elapsedMs / 55U) % kMatrixWidth);
+    const uint8_t y = static_cast<uint8_t>((elapsedMs / 160U + x / 3U) % kMatrixHeight);
+    setPixelXY(x, y, rgb(255, 255, 255));
+}
+
+void renderColorWipe(uint32_t elapsedMs) {
+    const uint8_t phase = static_cast<uint8_t>((elapsedMs / 1200U) % 4U);
+    uint32_t color = rgb(220, 20, 20);
+    if (phase == 1U) {
+        color = rgb(220, 220, 220);
+    } else if (phase == 2U) {
+        color = rgb(20, 20, 220);
+    } else if (phase == 3U) {
+        color = rgb(255, 180, 20);
+    }
+
+    const uint8_t fill = static_cast<uint8_t>((elapsedMs / 45U) % (kNumPixels + 1U));
+    clearAll();
+    for (uint16_t i = 0; i < fill; ++i) {
+        gMatrix->setPixelColor(i, color);
+    }
+}
+
+void renderConfetti(uint32_t) {
+    for (uint16_t i = 0; i < kNumPixels; ++i) {
+        const uint32_t c = gMatrix->getPixelColor(i);
+        const uint8_t r = static_cast<uint8_t>(((c >> 16) & 0xFFU) * 215U / 255U);
+        const uint8_t g = static_cast<uint8_t>(((c >> 8) & 0xFFU) * 215U / 255U);
+        const uint8_t b = static_cast<uint8_t>((c & 0xFFU) * 215U / 255U);
+        gMatrix->setPixelColor(i, rgb(r, g, b));
+    }
+
+    for (uint8_t i = 0; i < 12; ++i) {
+        const uint16_t idx = static_cast<uint16_t>(random(kNumPixels));
+        const uint8_t pick = static_cast<uint8_t>(random(3));
+        uint32_t color = rgb(255, 255, 255);
+        if (pick == 0U) {
+            color = rgb(255, 40, 40);
+        } else if (pick == 1U) {
+            color = rgb(255, 255, 255);
+        } else {
+            color = rgb(60, 60, 255);
+        }
+        gMatrix->setPixelColor(idx, color);
+    }
+}
+
 uint8_t getDebugPhase(uint32_t nowMs, uint32_t* phaseElapsedMs) {
-    const uint32_t totalCycleMs = 7000UL + 4000UL + 5000UL + 6000UL + 6000UL + 6000UL;
+    uint32_t totalCycleMs = 0;
+    for (uint8_t i = 0; i < (sizeof(kDebugPhaseDurationsMs) / sizeof(kDebugPhaseDurationsMs[0])); ++i) {
+        totalCycleMs += kDebugPhaseDurationsMs[i];
+    }
     uint32_t inCycle = nowMs % totalCycleMs;
 
     for (uint8_t phase = 0; phase < (sizeof(kDebugPhaseDurationsMs) / sizeof(kDebugPhaseDurationsMs[0])); ++phase) {
@@ -353,6 +547,35 @@ void fireworksRender(uint32_t elapsedMs) {
     }
 }
 
+void megaFireworksRender(uint32_t elapsedMs) {
+    // Keep trails brighter and spawn extra bursts for a heavier fireworks segment.
+    for (uint16_t i = 0; i < kNumPixels; ++i) {
+        const uint32_t c = gMatrix->getPixelColor(i);
+        const uint8_t r = static_cast<uint8_t>(((c >> 16) & 0xFFU) * 232U / 255U);
+        const uint8_t g = static_cast<uint8_t>(((c >> 8) & 0xFFU) * 232U / 255U);
+        const uint8_t b = static_cast<uint8_t>((c & 0xFFU) * 232U / 255U);
+        gMatrix->setPixelColor(i, rgb(r, g, b));
+    }
+
+    if ((elapsedMs % 120U) < 33U) {
+        for (uint8_t burst = 0; burst < 2; ++burst) {
+            const uint8_t cx = static_cast<uint8_t>(random(kMatrixWidth));
+            const uint8_t cy = static_cast<uint8_t>(random(kMatrixHeight));
+            const uint8_t colorPick = static_cast<uint8_t>(random(3));
+
+            uint32_t burstColor = rgb(255, 255, 255);
+            if (colorPick == 0U) {
+                burstColor = rgb(255, 50, 50);
+            } else if (colorPick == 2U) {
+                burstColor = rgb(70, 70, 255);
+            }
+
+            const uint8_t radius = static_cast<uint8_t>(1U + random(3));
+            spawnBurst(cx, cy, burstColor, radius);
+        }
+    }
+}
+
 void finaleInit() {
     clearAll();
 }
@@ -447,6 +670,33 @@ void runBringUpTest(Adafruit_NeoPixel& matrix, uint32_t nowMs) {
     matrix.show();
 }
 
+void runRawChainTest(Adafruit_NeoPixel& matrix, uint32_t nowMs) {
+    const uint8_t phase = static_cast<uint8_t>((nowMs / 1200U) % 5U);
+
+    if (phase < 4U) {
+        uint32_t color = matrix.Color(0, 0, 0);
+        if (phase == 0U) {
+            color = matrix.Color(120, 0, 0);
+        } else if (phase == 1U) {
+            color = matrix.Color(0, 120, 0);
+        } else if (phase == 2U) {
+            color = matrix.Color(0, 0, 120);
+        } else {
+            color = matrix.Color(90, 90, 90);
+        }
+
+        for (uint16_t i = 0; i < kNumPixels; ++i) {
+            matrix.setPixelColor(i, color);
+        }
+    } else {
+        matrix.clear();
+        const uint16_t idx = static_cast<uint16_t>((nowMs / 40U) % kNumPixels);
+        matrix.setPixelColor(idx, matrix.Color(255, 255, 255));
+    }
+
+    matrix.show();
+}
+
 void runCornerOrientationTest(Adafruit_NeoPixel& matrix, uint32_t nowMs) {
     matrix.clear();
 
@@ -510,28 +760,52 @@ void runDebugShowcase(Adafruit_NeoPixel& matrix, uint32_t nowMs) {
     const uint8_t phase = getDebugPhase(nowMs, &phaseElapsedMs);
     if (phase != previousPhase) {
         clearAll();
-        if (phase == 5U) {
+        if (phase == 7U) {
             fireworksInit();
         }
         previousPhase = phase;
     }
 
     if (phase == 0U) {
-        renderScrollingText(kDebugVersion, phaseElapsedMs, rgb(255, 255, 255), 70U);
+        renderStarSweep(phaseElapsedMs);
     } else if (phase == 1U) {
         renderUsaPulse(phaseElapsedMs);
     } else if (phase == 2U) {
         renderScrollingText("1776", phaseElapsedMs, rgb(255, 40, 40), 85U);
     } else if (phase == 3U) {
-        stripeRender(phaseElapsedMs);
+        renderScrollingText("HAPPY", phaseElapsedMs, rgb(240, 240, 240), 80U);
     } else if (phase == 4U) {
+        renderScrollingText("4TH", phaseElapsedMs, rgb(60, 60, 255), 80U);
+    } else if (phase == 5U) {
+        twinkleRender(phaseElapsedMs);
+    } else if (phase == 6U) {
+        stripeRender(phaseElapsedMs);
+    } else if (phase == 7U) {
+        fireworksRender(phaseElapsedMs);
+    } else if (phase == 8U) {
+        finaleRender(phaseElapsedMs);
+    } else if (phase == 9U) {
         renderStarSweep(phaseElapsedMs);
+    } else if (phase == 10U) {
+        renderSparkler(phaseElapsedMs);
+    } else if (phase == 11U) {
+        renderStarSweep(phaseElapsedMs);
+    } else if (phase == 12U) {
+        renderVerticalScanner(phaseElapsedMs);
+    } else if (phase == 13U) {
+        renderHorizontalScanner(phaseElapsedMs);
+    } else if (phase == 14U) {
+        renderCheckerPulse(phaseElapsedMs);
+    } else if (phase == 15U) {
+        renderBarsBreathing(phaseElapsedMs);
+    } else if (phase == 16U) {
+        renderTroopSalute(phaseElapsedMs);
+    } else if (phase == 17U) {
+        renderCometTrail(phaseElapsedMs);
+    } else if (phase == 18U) {
+        megaFireworksRender(phaseElapsedMs);
     } else {
-        if ((phaseElapsedMs / 1000U) < 3U) {
-            renderSparkler(phaseElapsedMs);
-        } else {
-            fireworksRender(phaseElapsedMs - 3000U);
-        }
+        renderConfetti(phaseElapsedMs);
     }
 
     matrix.show();
